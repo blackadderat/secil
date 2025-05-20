@@ -1,0 +1,158 @@
+services:
+
+  apisix:
+    image: apache/apisix:latest
+    container_name: apisix
+    volumes:
+      - ./conf/apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./ssl:/usr/local/apisix/ssl  # Mount SSL certificates
+    depends_on:
+      - etcd
+    ports:
+      - "80:9080"    # Map HTTP port 80 to APISIX 9080
+      - "443:9443"   # Map HTTPS port 443 to APISIX 9443
+      - "9180:9180"  # Admin API
+      - "9091:9091"  # Prometheus metrics
+      #- "9080:9080"
+      #- "9180:9180"
+      #- "9091:9091"
+    networks:
+      - secail_default
+
+  apisix-dashboard:
+    image: apache/apisix-dashboard:latest
+    container_name: apisix-dashboard
+    volumes:
+    - ./conf/dashboard/conf.yaml:/usr/local/apisix-dashboard/conf/conf.yaml
+    depends_on:
+      - apisix
+    ports:
+    - "9000:9000"
+    networks:
+      - secail_default
+
+  etcd:
+    image: bitnami/etcd:latest
+    container_name: etcd
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://0.0.0.0:2379
+    ports:
+      - "2379:2379"
+    networks:
+      - secail_default
+
+  vendor-viasat-truck:
+    build: ./vendor-viasat-truck
+    container_name: vendor-viasat-truck
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "7001:7001"
+    networks:
+      - secail_default
+    depends_on:
+      - kafka
+      - etcd
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: kafka
+    environment:
+      KAFKA_CFG_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_CFG_PROCESS_ROLES: "broker,controller"
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_KRAFT_CLUSTER_ID: "my-cluster-id-$(cat /proc/sys/kernel/random/uuid)"
+    ports:
+      - "9092:9092"
+    networks:
+      - secail_default
+
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+    networks:
+      - secail_default
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./conf/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - secail_default
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    networks:
+      - secail_default
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    ports:
+      - "16686:16686"
+    networks:
+      - secail_default
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./conf/grafana/provisioning:/etc/grafana/provisioning
+      - ./conf/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./conf/grafana/config/grafana.ini:/etc/grafana/grafana.ini
+    networks:
+      - secail_default
+
+  httpbin:
+    image: mccutchen/go-httpbin:latest
+    container_name: httpbin
+    ports:
+      - "8080:8080"
+    networks:
+      - secail_default
+
+  web1:
+    image: nginx:1.26.0-alpine
+    container_name: web1
+    volumes:
+      - ./upstream/web1.conf:/etc/nginx/nginx.conf
+    ports:
+      - "9081:80"
+    networks:
+      - secail_default
+
+  web2:
+    image: nginx:1.26.0-alpine
+    container_name: web2
+    volumes:
+      - ./upstream/web2.conf:/etc/nginx/nginx.conf
+    ports:
+      - "9082:80"
+    networks:
+      - secail_default
+
+networks:
+  secail_default:
+    driver: bridge

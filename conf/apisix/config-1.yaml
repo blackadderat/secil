@@ -1,0 +1,56 @@
+deployment:
+  role: traditional
+  role_traditional:
+    config_provider: etcd
+  admin:
+    allow_admin:                 # Admin API access restriction
+      - 0.0.0.0/0                # Allow all IPs access
+    admin_key:
+      - name: "admin"
+        key: edd1c9f034335f136f87ad84b625c8f1
+        role: admin
+    admin_listen:
+      ip: 0.0.0.0
+      port: 9180
+
+apisix:
+  node_listen: 9080              # APISIX listening port
+  enable_ipv6: false
+
+etcd:
+  host:                          # etcd addresses
+    - "http://etcd:2379"         # Use the service name from docker-compose
+  prefix: "/apisix"              # apisix configurations prefix
+  timeout: 30                    # 30 seconds
+
+plugin_attr:
+  prometheus:
+    export_addr:
+      ip: "0.0.0.0"
+      port: 9091
+  opentelemetry:
+    collector:
+      address: jaeger:4318
+
+plugins:
+  - http-logger
+  - ip-restriction
+  - jwt-auth
+  - key-auth
+  - basic-auth
+  - limit-conn
+  - limit-count
+  - limit-req
+  - prometheus
+  - serverless-post-function
+  - serverless-pre-function
+  - zipkin
+  - traffic-split
+  - azure-functions
+  - public-api
+  - consumer-restriction
+  - loki-logger
+  - opentelemetry
+
+ext-plugin:
+  path_for_test: /tmp/runner.sock
