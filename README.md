@@ -14,6 +14,6 @@ Es nutzt [Apache APISIX](https://apisix.apache.org/) als zentrales API Gateway, 
 ## Quickstart
 
 ```sh
-git clone https://github.com/blackadderat/apisix-vendor-integration-template.git
-cd apisix-vendor-integration-template
+git clone https://github.com/blackadderat/secil.git
+cd secil
 docker-compose up -d
